@@ -1,234 +1,98 @@
 <link href="//fonts.googleapis.com/css?family=Montserrat:300,400,500,700" rel="stylesheet">
-<script type="text/discourse-plugin" version="0.6">
-const ajax = require('discourse/lib/ajax').ajax;
-const Topic = require('discourse/models/topic').default;
+<script type="text/discourse-plugin" version="0.8">
+  const ajax = require('discourse/lib/ajax').ajax;
+  const Topic = require('discourse/models/topic').default;
+  // We're using ajax and the Topic model from Discourse
 
-api.registerConnectorClass('below-site-header', 'experts-homepage', {
-    actions: {
-        hideHomepage(){
-            this.set('collapseHomepage', true);
-            $.cookie('collapse-homepage', true);
-            $('html').addClass('collapse-experts-homepage');
-        },
-        showHomepage(){
-            this.set('collapseHomepage', false);
-            $.cookie('collapse-homepage', false);
-            $('html').removeClass('collapse-experts-homepage');
-        }
-    },
-    shouldRender(args, component) {
-        return true;
-    },
+  api.registerConnectorClass('above-main-container', 'featured-topics', {
+    // above-main-container is the plugin outlet,
+    // featured-topics is your custom component name
+
     setupComponent(args, component) {
-        if ($.cookie('collapse-homepage') == "true"){
-            component.set('collapseHomepage', true);
-            $('html').addClass('collapse-experts-homepage');
-        }
-        else{
-            component.set('collapseHomepage', false);
-            $('html').removeClass('collapse-experts-homepage');
-        }
-        component.set('hostname', window.location.hostname);
 
-        api.onPageChange((url, title) => {
-            if (url == "/"){
-                $('html').addClass('show-experts-homepage');
-                component.set('displayCustomHomepage', true);
-                $('#main-outlet a').click(function(event){
-                    $('.below-site-header-outlet.experts-homepage').addClass("hidden");
-                    component.set('displayCustomHomepage', false);
-                });
-                ajax("/c/3.json").then (function(result){
-                    topicListOne = [];
-                    var usersOne = result.users;
-                    result.topic_list.topics.slice(0,5).forEach(function(topic){
-                        topic.posters.forEach(function(poster){
-                            poster.user = $.grep(usersOne, function(e){ return e.id == poster.user_id; })[0];
-                        });
-                        topicListOne.push(Topic.create(topic));
-                    });
-                    component.set('topicListOne', topicListOne);
-                });
-                ajax("/c/2.json").then (function(result){
-                    topicListTwo = [];
-                    var usersTwo = result.users;
-                    result.topic_list.topics.slice(0,5).forEach(function(topic){
-                        topic.posters.forEach(function(poster){
-                            poster.user = $.grep(usersTwo, function(e){ return e.id == poster.user_id; })[0];
-                        });
-                        topicListTwo.push(Topic.create(topic));
-                    });
-                    component.set('topicListTwo', topicListTwo);
-                });
-                ajax("/latest.json?order=posts&ascending=true").then (function(result){
-                    component.set('topicListThree', result.topic_list.topics.slice(0,3));
-                });
+      api.onPageChange((url, title) => {
+        if ((url == "/") || (url == "/latest") ){
+        // on page change, check if url matches
+        // if your homepage isn't /latest change this to /categories
 
-            }
-            else {
-                $('html').removeClass('show-experts-homepage');
-                $('#main-outlet a').click(function(){
-                    if ($(this).attr('href') == "/"){
-                        component.set('displayCustomHomepage', true);
-                        $('.below-site-header-outlet.experts-homepage').removeClass("hidden");
-                    }
-                });
-                $('.d-header .title').click(function(){
-                    component.set('displayCustomHomepage', true);
-                    $('.below-site-header-outlet.experts-homepage').removeClass("hidden");
-                });
-                component.set('displayCustomHomepage', false);
-            }
-        });
+          $('html').addClass('custom-featured-topics');
+          // add a class to the HTML tag for easy CSS targetting
+
+          component.set('displayfeaturedTopics', true);
+          // we'll use this later to show our template
+
+          component.set("loadingTopics", true);
+          // helps us show a loading spinner until topics are ready
+
+          ajax("/tags/featured.json").then (function(result){
+          // Get posts from tag "featured" using AJAX
+          // if this were a category you'd use /c/featured.json
+
+            featuredTopics = [];
+            // Create an empty array, we'll push topics into it
+
+            var featuredUsers = result.users;
+            // Get the relevant users
+
+            result.topic_list.topics.slice(0,4).forEach(function(topic){
+            // We're extracting the topics starting at 0 and ending at 4
+            // This means we'll show 3 total. Increase 4 to see more.
+
+              topic.posters.forEach(function(poster){
+                poster.user = $.grep(featuredUsers, function(e){ return e.id == poster.user_id; })[0];
+              });
+              // Associate users with our topic
+
+              featuredTopics.push(Topic.create(topic));
+              // Push our topics into the featuredTopics array
+            });
+
+            component.set("loadingTopics", false);
+            // Topics are loaded, stop showing the loading spinner
+
+            component.set('featuredTopics', featuredTopics);
+            // Setup our component with the topics from the array
+          });
+
+        } else {
+        // If the page doesn't match the urls above, do this:
+
+          $('html').removeClass('custom-featured-topics');
+          // Remove our custom class
+
+          component.set('displayfeaturedTopics', false);
+          // Don't display our customization
+        }
+      });
     }
-});
+  });
 </script>
-<script type='text/x-handlebars' data-template-name='/connectors/below-site-header/experts-homepage'>
-{{#if displayCustomHomepage}}
-    <div class="experts-homepage-wrapper">
-        <div id="homepage-banner">
-            <div id="homepage-banner-inner">
-                <div id="homepage-banner-content">
-                    <div id="homepage-banner-content-inner">
 
-    {{#if collapseHomepage}}
-                        {{#if homeToDo_0}}
-                            <h3 id="cover_subtitle_whatnext">Things to Do</h3>
-                        {{else}}
-                            <h3 id="cover_subtitle_whatnext">What Next?</h3>
-                        {{/if}}
-    {{else}}
-                        <h1 id="cover_title">Cover Title</h1>
-                        <h2 id="cover_subtitle">Cover Subtitle</h2>
-    {{/if}}
-                    </div>
-                </div>
-            </div>
-        </div>
-    {{#if collapseHomepage}}
-        {{#d-button action="showHomepage" id="show-homepage" class="btn" icon="plus"}} View Intro{{/d-button}}
-    {{else}}
-        {{#d-button action="hideHomepage" id="hide-homepage" class="btn" icon="minus"}}Seen It{{/d-button}}
-    {{/if}}
+<script
+  type="text/x-handlebars"
+  data-template-name="/connectors/above-main-container/featured-topics"
+>
 
-    {{#if collapseHomepage}}
+  {{#if displayfeaturedTopics}}
+  <!-- If our component is true, show this content: -->
 
-    {{else}}
+      <div class="custom-featured-topics-wrapper">
+        {{conditional-loading-spinner condition=loadingTopics}}
+        <!-- Show a loading spinner if topics are loading -->
 
-    <div class="homepage-container">
+        {{#unless loadingTopics}}
+        <!-- Unless topics are still loading... -->
+          {{topic-list topics=featuredTopics showPosters=true}}
+          <!-- Show the topic list -->
+        {{/unless}}
 
-        <div class="container topic-lists">
-            <div class="wrap">
-                <div class="box box-2">
-                    <div class="header-wrapper">
-                        <h3 class="inline">Topic List One</h3>
-                        {{#d-button action="createChallenge" class="btn-primary btn right"}}POST{{/d-button}}
-                    </div>
-                    {{topic-list topics=topicListOne showPosters=true}}
-                    {{#if site.mobileView}}
-                        <a href="/tags/challenges" class="btn-primary btn full-width">MORE</a>
-                    {{/if}}
-                </div>
-                <div class="box box-2">
-                    <div class="header-wrapper">
-                        <h3 class="inline">TopicListTwo</h3>
-                        {{#d-button action="createLink" class="btn-primary btn right"}}SHARE LINK{{/d-button}}
-                    </div>
-                    {{topic-list topics=topicListTwo showPosters=true}}
-                    {{#if site.mobileView}}
-                        <a href="/tags/reading" class="btn-primary btn full-width">MORE</a>
-                    {{/if}}
-                </div>
-            </div>
-            {{#unless site.mobileView}}
-                <div class="wrap">
-                    <div class="box box-2">
-                        <a href="/tags/challenges" class="btn-primary btn full-width">MORE</a>
-                    </div>
-                    <div class="box box-2">
-                        <a href="/tags/reading" class="btn-primary btn full-width">MORE</a>
-                    </div>
-                </div>
-            {{/unless}}
-        </div>
-        <div class="container engagement-boxes center">
-            <div class="wrap">
-                <h2>Engagement Boxes</h2>
-                <div class="box box-4">
-                    <a href="/">
-                        <div class="icon-wrapper">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 72"><defs><style>.cls-1{fill:none;stroke:#f29d33;stroke-linecap:round;stroke-linejoin:round;stroke-width:3px;}</style></defs><title>Training_y</title><g id="Layer_2" data-name="Layer 2"><g id="Layer_1-2" data-name="Layer 1"><ellipse class="cls-1" cx="36" cy="13.48" rx="12.21" ry="12.47"/></g></g></svg>
-                        </div>
-                        <span>Box One</span>
-                    </a>
-                </div>
-                <div class="box box-4">
-                    <a href="/c/persuasion">
-                        <div class="icon-wrapper">
+      </div>
 
-                        </div>
-                        <span>Box 2</span>
-                    </a>
-                </div>
-                <div class="box box-4">
-                    <a href="/c/communities">
-                        <div class="icon-wrapper">
-
-                        </div>
-                        <span>Box 3</span>
-                    </a>
-                </div>
-                <div class="box box-4">
-                    <a href="/c/platforms-technology">
-                        <div class="icon-wrapper">
-
-                        </div>
-                        <span>Box 4</span>
-                    </a>
-                </div>
-            </div>
-        </div>
-        <div class="container help-people homepage-title center background-color">
-            <div class="wrap">
-                <h2>Topic List Three</h2>
-                <div class="container">
-                    <div class="postsContainerFlex">
-                        {{#each topicListThree as |topic|}}
-                            <div class="postContainer">
-                                <div class="postShadow">
-                                    <div class="image-section">
-                                        <a href="/t/{{topic.slug}}/{{topic.id}}/{{topic.last_read_post_number}}"><img src="/user_avatar/{{hostname}}/{{topic.last_poster_username}}/370/617_1.png" class="teammember_img" /></a>
-                                    </div>
-                                    <div class="postTitle">
-                                        <div class="postDate">{{format-date topic.created_at}}</div>
-                                        <a href="/t/{{topic.slug}}/{{topic.id}}/{{topic.last_read_post_number}}">{{topic.title}}</a>
-                                    </div>
-                                    <div class="postInfo">
-                                        <div class="postAuthor">by <a href="/users/{{topic.last_poster_username}}/activity">{{topic.last_poster_username}}</a></div>
-                                        <div class="postComments">
-                                            <span class="likes"><i class="fa fa-thumbs-up"></i>{{topic.like_count}}</span>
-                                            <a href="/t/{{topic.slug}}/{{topic.id}}/{{topic.last_read_post_number}}">
-                                                <span class="comments"><i class="fa fa-comments"></i>{{topic.posts_count}}</span>
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        {{/each}}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {{/if}}
-    </div>
-{{/if}}
+  {{/if}}
 </script>
+
 <script type="text/javascript">
 $(document).ready(function(e) {
-
-    console.log(Discourse.User.current());
 
     $(".experts-homepage.ember-view").on("click", "#homepage-banner-link-help-others", function(e) {
         e.preventDefault();
